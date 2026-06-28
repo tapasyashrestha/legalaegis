@@ -1,20 +1,71 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Aegis AI
 
-# Run and deploy your AI Studio app
+Aegis AI is an intelligent document analysis platform powered by **FastAPI**, **React**, and a **Multi-Agent RAG (Retrieval-Augmented Generation)** architecture. It enables users to upload documents, retrieve relevant information using vector search, and generate accurate AI-powered responses.
 
-This contains everything you need to run your app locally.
+## Features
 
-View your app in AI Studio: https://ai.studio/apps/d7b87b9b-f8ed-4e70-bc07-65d88129d5e7
+*  Multi-Agent RAG Pipeline
+*  PDF Processing with `pdfplumber`
+*  Semantic Search using `pgvector`
+*  OpenAI-powered AI Assistant
+*  Firebase Authentication
+*  FastAPI Backend
+*  Modern React Frontend
+*  Document Upload & Retrieval
 
-## Run Locally
+## Tech Stack
 
-**Prerequisites:**  Node.js
+**Frontend**
 
+* React
+* TypeScript
+* Tailwind CSS
+* Firebase
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+**Backend**
+
+* FastAPI
+* Python
+* OpenAI API
+* pgvector
+* PostgreSQL
+* pdfplumber
+
+## Project Structure
+
+```text
+frontend/
+backend/
+docs/
+```
+
+## Installation
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### Backend
+
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn main:app --reload
+```
+
+## Future Enhancements
+
+* Multi-document reasoning
+* OCR support
+* Conversation memory
+* Role-based authentication
+* Cloud deployment
+* Advanced analytics
+
+## License
+
+This project is developed for educational and research purposes.
