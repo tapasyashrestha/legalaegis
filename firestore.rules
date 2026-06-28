@@ -1,0 +1,170 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net
+    match /{document=**} { 
+      allow read, write: if false; 
+    }
+
+    // --- Helpers ---
+    function isSignedIn() { return request.auth != null; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+
+    // --- Validations ---
+    function isValidUser(data) {
+      return data.keys().hasAll(['name', 'email', 'role', 'createdAt'])
+        && data.keys().size() == 4
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 100
+        && data.email is string && data.email.size() > 0 && data.email.size() <= 100
+        && data.role is string && (data.role == 'customer' || data.role == 'lawyer')
+        && data.createdAt is string && data.createdAt.size() <= 30;
+    }
+
+    function isValidReport(data) {
+      return data.keys().hasAll(['userId', 'notice_id', 'status', 'summary', 'severity', 'notice_type', 'created_at'])
+        && data.userId is string && data.userId.size() <= 128
+        && data.notice_id is string && data.notice_id.size() <= 128
+        && data.status is string && data.status.size() <= 50
+        && data.summary is string && data.summary.size() <= 5000
+        && data.severity is string && data.severity.size() <= 50
+        && data.notice_type is string && data.notice_type.size() <= 100
+        && data.created_at is string && data.created_at.size() <= 30
+        && (!('applicable_sections' in data.keys()) || (data.applicable_sections is list && data.applicable_sections.size() <= 50))
+        && (!('issues_found' in data.keys()) || (data.issues_found is list && data.issues_found.size() <= 50))
+        && (!('consequences' in data.keys()) || (data.consequences is list && data.consequences.size() <= 50))
+        && (!('required_documents' in data.keys()) || (data.required_documents is list && data.required_documents.size() <= 50))
+        && (!('deadlines' in data.keys()) || (data.deadlines is list && data.deadlines.size() <= 50))
+        && (!('recommendations' in data.keys()) || (data.recommendations is list && data.recommendations.size() <= 50))
+        && (!('confidence_score' in data.keys()) || (data.confidence_score is number))
+        && (!('qa_history' in data.keys()) || (data.qa_history is list && data.qa_history.size() <= 100))
+        && (!('user_questions' in data.keys()) || (data.user_questions is list))
+        && (!('ai_answers' in data.keys()) || (data.ai_answers is list));
+    }
+
+    function isValidLawyer(data) {
+      return data.keys().hasAll(['name', 'specialties', 'experience_years', 'rating', 'cases_won', 'hourly_rate'])
+        && data.name is string && data.name.size() <= 100
+        && data.specialties is list && data.specialties.size() <= 20
+        && data.experience_years is number
+        && data.rating is number
+        && data.cases_won is number
+        && data.hourly_rate is number;
+    }
+
+    function isValidInvitation(data) {
+      return data.keys().hasAll(['lawyer_id', 'customer_id', 'report_id', 'status', 'created_at'])
+        && data.keys().size() == 5
+        && data.lawyer_id is string && data.lawyer_id.size() <= 128
+        && data.customer_id is string && data.customer_id.size() <= 128
+        && data.report_id is string && data.report_id.size() <= 128
+        && data.status is string && (data.status == 'pending' || data.status == 'accepted' || data.status == 'rejected')
+        && data.created_at is string && data.created_at.size() <= 30;
+    }
+
+    function isValidMessage(data) {
+      return data.keys().hasAll(['sender_id', 'sender_name', 'sender_role', 'text', 'timestamp'])
+        && data.keys().size() == 5
+        && data.sender_id is string && data.sender_id.size() <= 128
+        && data.sender_name is string && data.sender_name.size() <= 100
+        && data.sender_role is string && (data.sender_role == 'customer' || data.sender_role == 'lawyer')
+        && data.text is string && data.text.size() > 0 && data.text.size() <= 5000
+        && data.timestamp is string && data.timestamp.size() <= 30;
+    }
+
+    function isValidDocument(data) {
+      return data.keys().hasAll(['name', 'uploaded_by_id', 'uploaded_by_name', 'timestamp', 'url', 'size'])
+        && data.keys().size() == 6
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 500
+        && data.uploaded_by_id is string && data.uploaded_by_id.size() <= 128
+        && data.uploaded_by_name is string && data.uploaded_by_name.size() <= 100
+        && data.timestamp is string && data.timestamp.size() <= 30
+        && data.url is string && data.url.size() <= 2000
+        && data.size is number && data.size >= 0;
+    }
+
+    // --- Collections ---
+
+    match /users/{userId} {
+      allow read: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+      allow create: if isSignedIn() && isValidId(userId) && request.auth.uid == userId && isValidUser(incoming());
+      // Users shouldn't change their own role after creation
+      allow update: if isSignedIn() && isValidId(userId) && request.auth.uid == userId && isValidUser(incoming()) && incoming().role == existing().role;
+    }
+
+    match /reports/{reportId} {
+      allow read: if isSignedIn() && isValidId(reportId) && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(reportId) && incoming().userId == request.auth.uid && isValidReport(incoming());
+      allow update: if isSignedIn() && isValidId(reportId) && existing().userId == request.auth.uid && incoming().userId == request.auth.uid && isValidReport(incoming());
+    }
+
+    match /lawyers/{lawyerId} {
+      allow read: if isSignedIn() && isValidId(lawyerId);
+      allow list: if isSignedIn();
+      // Allow seeding from client for now
+      allow write: if isSignedIn();
+    }
+
+    match /invitations/{invitationId} {
+      // Both customer and lawyer can read
+      allow read: if isSignedIn() && isValidId(invitationId) && (existing().customer_id == request.auth.uid || existing().lawyer_id == request.auth.uid);
+      allow list: if isSignedIn() && (resource.data.customer_id == request.auth.uid || resource.data.lawyer_id == request.auth.uid);
+      
+      // Customer creates invitation
+      allow create: if isSignedIn() && isValidId(invitationId) && incoming().customer_id == request.auth.uid && isValidInvitation(incoming())
+        // Verify lawyer exists
+        && exists(/databases/$(database)/documents/lawyers/$(incoming().lawyer_id))
+        // Verify report exists and belongs to customer
+        && exists(/databases/$(database)/documents/reports/$(incoming().report_id))
+        && get(/databases/$(database)/documents/reports/$(incoming().report_id)).data.userId == request.auth.uid;
+      
+      // Lawyer or customer can update status
+      allow update: if isSignedIn() && isValidId(invitationId) 
+        && (existing().customer_id == request.auth.uid || existing().lawyer_id == request.auth.uid)
+        && isValidInvitation(incoming())
+        && incoming().customer_id == existing().customer_id
+        && incoming().lawyer_id == existing().lawyer_id
+        && incoming().report_id == existing().report_id
+        && incoming().created_at == existing().created_at
+        && incoming().diff(existing()).affectedKeys().hasOnly(['status']);
+    }
+
+    match /invitations/{invitationId}/messages/{messageId} {
+      // Must be participant to read
+      allow read: if isSignedIn() && isValidId(invitationId) && isValidId(messageId)
+        && exists(/databases/$(database)/documents/invitations/$(invitationId))
+        && (get(/databases/$(database)/documents/invitations/$(invitationId)).data.customer_id == request.auth.uid || get(/databases/$(database)/documents/invitations/$(invitationId)).data.lawyer_id == request.auth.uid);
+      
+      allow list: if isSignedIn() && isValidId(invitationId)
+        && exists(/databases/$(database)/documents/invitations/$(invitationId))
+        && (get(/databases/$(database)/documents/invitations/$(invitationId)).data.customer_id == request.auth.uid || get(/databases/$(database)/documents/invitations/$(invitationId)).data.lawyer_id == request.auth.uid);
+
+      // Must be participant to write
+      allow create: if isSignedIn() && isValidId(invitationId) && isValidId(messageId)
+        && incoming().sender_id == request.auth.uid
+        && exists(/databases/$(database)/documents/invitations/$(invitationId))
+        && (get(/databases/$(database)/documents/invitations/$(invitationId)).data.customer_id == request.auth.uid || get(/databases/$(database)/documents/invitations/$(invitationId)).data.lawyer_id == request.auth.uid)
+        && isValidMessage(incoming());
+    }
+
+    match /invitations/{invitationId}/documents/{documentId} {
+      // Must be participant to read
+      allow read: if isSignedIn() && isValidId(invitationId) && isValidId(documentId)
+        && exists(/databases/$(database)/documents/invitations/$(invitationId))
+        && (get(/databases/$(database)/documents/invitations/$(invitationId)).data.customer_id == request.auth.uid || get(/databases/$(database)/documents/invitations/$(invitationId)).data.lawyer_id == request.auth.uid);
+      
+      allow list: if isSignedIn() && isValidId(invitationId)
+        && exists(/databases/$(database)/documents/invitations/$(invitationId))
+        && (get(/databases/$(database)/documents/invitations/$(invitationId)).data.customer_id == request.auth.uid || get(/databases/$(database)/documents/invitations/$(invitationId)).data.lawyer_id == request.auth.uid);
+
+      // Must be participant to write
+      allow create: if isSignedIn() && isValidId(invitationId) && isValidId(documentId)
+        && incoming().uploaded_by_id == request.auth.uid
+        && exists(/databases/$(database)/documents/invitations/$(invitationId))
+        && (get(/databases/$(database)/documents/invitations/$(invitationId)).data.customer_id == request.auth.uid || get(/databases/$(database)/documents/invitations/$(invitationId)).data.lawyer_id == request.auth.uid)
+        && isValidDocument(incoming());
+    }
+  }
+}

@@ -1,0 +1,130 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["customer", "lawyer"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["name", "email", "role", "createdAt"]
+    },
+    "Report": {
+      "title": "Report",
+      "description": "Notice parsing report.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "notice_id": { "type": "string" },
+        "status": { "type": "string" },
+        "summary": { "type": "string" },
+        "severity": { "type": "string", "enum": ["Low", "Medium", "High", "Critical"] },
+        "notice_type": { "type": "string" },
+        "applicable_sections": { "type": "array", "items": { "type": "string" } },
+        "issues_found": { "type": "array", "items": { "type": "string" } },
+        "consequences": { "type": "array", "items": { "type": "string" } },
+        "required_documents": { "type": "array", "items": { "type": "string" } },
+        "deadlines": { "type": "array", "items": { "type": "string" } },
+        "recommendations": { "type": "array", "items": { "type": "string" } },
+        "confidence_score": { "type": "number" },
+        "created_at": { "type": "string" },
+        "qa_history": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "question": { "type": "string" },
+              "answer": { "type": "string" },
+              "timestamp": { "type": "string" }
+            }
+          }
+        }
+      },
+      "required": ["userId", "notice_id", "status", "summary", "severity", "notice_type", "created_at"]
+    },
+    "Lawyer": {
+      "title": "Lawyer",
+      "description": "Lawyer profile.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "specialties": { "type": "array", "items": { "type": "string" } },
+        "experience_years": { "type": "number" },
+        "rating": { "type": "number" },
+        "cases_won": { "type": "number" },
+        "hourly_rate": { "type": "number" }
+      },
+      "required": ["name", "specialties", "experience_years", "rating", "cases_won", "hourly_rate"]
+    },
+    "Invitation": {
+      "title": "Invitation",
+      "description": "Invitation from a customer to a lawyer.",
+      "type": "object",
+      "properties": {
+        "lawyer_id": { "type": "string" },
+        "customer_id": { "type": "string" },
+        "report_id": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "rejected"] },
+        "created_at": { "type": "string" }
+      },
+      "required": ["lawyer_id", "customer_id", "report_id", "status", "created_at"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "A chat message in an invitation workspace.",
+      "type": "object",
+      "properties": {
+        "sender_id": { "type": "string" },
+        "sender_name": { "type": "string" },
+        "sender_role": { "type": "string" },
+        "text": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["sender_id", "sender_name", "sender_role", "text", "timestamp"]
+    },
+    "Document": {
+      "title": "Document",
+      "description": "A shared document in an invitation workspace.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "uploaded_by_id": { "type": "string" },
+        "uploaded_by_name": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "url": { "type": "string" },
+        "size": { "type": "number" }
+      },
+      "required": ["name", "uploaded_by_id", "uploaded_by_name", "timestamp", "url", "size"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles"
+    },
+    "/reports/{reportId}": {
+      "schema": { "$ref": "#/entities/Report" },
+      "description": "User reports"
+    },
+    "/lawyers/{lawyerId}": {
+      "schema": { "$ref": "#/entities/Lawyer" },
+      "description": "Lawyer directory"
+    },
+    "/invitations/{invitationId}": {
+      "schema": { "$ref": "#/entities/Invitation" },
+      "description": "Case invitations"
+    },
+    "/invitations/{invitationId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/Message" },
+      "description": "Messages for an invitation"
+    },
+    "/invitations/{invitationId}/documents/{documentId}": {
+      "schema": { "$ref": "#/entities/Document" },
+      "description": "Documents for an invitation"
+    }
+  }
+}
